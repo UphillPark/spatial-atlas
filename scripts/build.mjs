@@ -1,0 +1,17 @@
+import { readFile, readdir, mkdir, cp, writeFile, rm } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
+import { normalizeProjects, graphEdges } from './content.mjs';
+const root = fileURLToPath(new URL('../', import.meta.url));
+const read = async p => JSON.parse((await readFile(root+p, 'utf8')).replace(/^\uFEFF/, ''));
+const files = (await readdir(root+'content/projects')).filter(f=>f.endsWith('.json'));
+const projects = normalizeProjects(await Promise.all(files.map(f=>read('content/projects/'+f))));
+const site = await read('content/site.json');
+const out=path.resolve(root,'dist');
+if(path.dirname(out)!==path.resolve(root)) throw new Error('Output must stay inside the project.');
+await rm(out, {recursive:true, force:true});
+await mkdir(root+'dist', {recursive:true});
+await cp(root+'public', root+'dist', {recursive:true});
+await writeFile(root+'dist/data.json', JSON.stringify({site,projects,edges:graphEdges(projects)},null,2));
+await writeFile(root+'dist/.nojekyll', '');
+console.log(`Built ${projects.length} public projects, ${graphEdges(projects).length} relationships.`);
